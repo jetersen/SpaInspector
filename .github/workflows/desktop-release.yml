@@ -9,6 +9,9 @@ on:
     types: [published]
 permissions:
   contents: read
+concurrency:
+  group: desktop-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 jobs:
   build:
     strategy:
@@ -37,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: python3 tools/check-public-boundary.py
+      - run: python3 packaging/test_package.py
       - name: Version
         run: |
           version="${RELEASE_TAG:-0.1.0}"
