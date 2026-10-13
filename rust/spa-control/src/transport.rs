@@ -148,6 +148,8 @@ fn response(stream: &mut TcpStream, status: &str, value: Value) -> io::Result<()
     stream.write_all(&body)
 }
 fn connection(mut stream: TcpStream, broker: Broker, stop: Arc<AtomicBool>) -> io::Result<()> {
+    // Accepted sockets can inherit the nonblocking listener flag on macOS.
+    stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
     let raw = header(&mut stream)?;
