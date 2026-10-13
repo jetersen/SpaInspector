@@ -1,39 +1,42 @@
-name: Deploy to GitHub Pages
-
+name: GitHub Pages
 on:
   push:
     branches: [main]
-
+  workflow_dispatch:
 permissions:
-  contents: write
-
+  contents: read
 concurrency:
   group: github-pages
   cancel-in-progress: true
-
 jobs:
-  deploy-to-github-pages:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Check public distribution boundary
-        run: python tools/check-public-boundary.py
-      - name: Set up Rust and Trunk
+      - run: python3 tools/check-public-boundary.py
+      - uses: actions/configure-pages@v5
+      - name: Install build tools
         run: |
           rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
           rustup default 1.99.0
           cargo install trunk --version 0.21.14 --locked
-      - name: Publish egui WebAssembly
+      - name: Build browser viewer
         working-directory: rust/spa-inspector
         env:
           NO_COLOR: 'true'
         run: trunk build --release --public-url '/${{ github.event.repository.name }}/' --dist ../../artifacts/pages
-      - name: Prepare static hosting
-        run: |
-          cp artifacts/pages/index.html artifacts/pages/404.html
-          touch artifacts/pages/.nojekyll
-      - name: Deploy egui application
-        uses: JamesIves/github-pages-deploy-action@v4
+      - uses: actions/upload-pages-artifact@v4
         with:
-          branch: gh-pages
-          folder: artifacts/pages
+          path: artifacts/pages
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deploy

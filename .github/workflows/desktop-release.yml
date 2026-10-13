@@ -1,0 +1,112 @@
+name: Desktop packages
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+          - os: macos-15-intel
+            platform: macos
+            target: x86_64-apple-darwin
+          - os: macos-15
+            platform: macos
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 tools/check-public-boundary.py
+      - name: Version
+        run: |
+          version="${RELEASE_TAG:-0.1.0}"
+          echo "VERSION=${version#v}" >> "$GITHUB_ENV"
+      - name: Rust
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal --target "$TARGET"
+          rustup default 1.99.0
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.platform == 'windows' && '-C target-feature=+crt-static' || '' }}
+        run: cargo build --locked --release -p spa-inspector --target "$TARGET"
+      - name: Stage
+        run: |
+          suffix=""
+          if [ '${{ matrix.platform }}' = windows ]; then suffix=.exe; fi
+          python3 packaging/package.py '${{ matrix.platform }}' --binary "target/$TARGET/release/spa-inspector$suffix" --version "$VERSION"
+          mkdir -p artifacts/downloads
+      - uses: actions/setup-dotnet@v5
+        if: matrix.platform == 'windows'
+        with:
+          dotnet-version: 8.0.x
+      - name: Windows executable and per-user MSI
+        if: matrix.platform == 'windows'
+        run: |
+          dotnet tool install --global wix --version 4.0.6
+          cp artifacts/package/spa-inspector.exe "artifacts/downloads/SpaInspector-$VERSION-windows-x64.exe"
+          cd artifacts/package
+          wix build installer.wxs -arch x64 -o "../downloads/SpaInspector-$VERSION-windows-x64.msi"
+      - name: Linux AppImage and Flatpak
+        if: matrix.platform == 'linux'
+        run: |
+          curl -fL https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o artifacts/appimagetool
+          echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  artifacts/appimagetool' | sha256sum -c -
+          chmod +x artifacts/appimagetool
+          ARCH=x86_64 artifacts/appimagetool --appimage-extract-and-run artifacts/package/SpaInspector.AppDir "artifacts/downloads/SpaInspector-$VERSION-linux-x86_64.AppImage"
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean --repo=artifacts/flatpak-repo artifacts/flatpak-build artifacts/package/flatpak.json
+          flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo artifacts/flatpak-repo "artifacts/downloads/SpaInspector-$VERSION-linux-x86_64.flatpak" io.github.jetersen.SpaInspector
+      - name: macOS disk image
+        if: matrix.platform == 'macos'
+        run: |
+          codesign --force --deep --sign - 'artifacts/package/SPA Inspector.app'
+          codesign --verify --deep --strict 'artifacts/package/SPA Inspector.app'
+          hdiutil create -volname 'SPA Inspector' -srcfolder artifacts/package -ov -format UDZO "artifacts/downloads/SpaInspector-$VERSION-$TARGET.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: artifacts/downloads/*
+          if-no-files-found: error
+  publish:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: downloads
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        working-directory: downloads
+        run: |
+          sha256sum * > SHA256SUMS
+          gh release upload "$RELEASE_TAG" ./* --clobber

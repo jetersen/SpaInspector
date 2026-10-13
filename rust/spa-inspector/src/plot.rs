@@ -159,18 +159,26 @@ impl SpectrumPlot {
             height,
         } = options;
         let plot_id = ui.make_persistent_id(id);
-        let keys = inputs
-            .iter()
-            .map(|t| {
-                (
-                    t.x.as_ptr() as usize,
-                    t.y.as_ptr() as usize,
-                    t.x.len(),
-                    t.name.to_owned(),
-                )
-            })
-            .collect::<Vec<_>>();
-        if keys != self.keys || self.palette_dark != ui.visuals().dark_mode {
+        let data_changed = self.keys.len() != inputs.len()
+            || self.keys.iter().zip(inputs).any(|(key, input)| {
+                key.0 != input.x.as_ptr() as usize
+                    || key.1 != input.y.as_ptr() as usize
+                    || key.2 != input.x.len()
+                    || key.3 != input.name
+            });
+        if data_changed || self.palette_dark != ui.visuals().dark_mode {
+            // Allocate cache keys only when a trace or the theme actually changes.
+            let keys = inputs
+                .iter()
+                .map(|input| {
+                    (
+                        input.x.as_ptr() as usize,
+                        input.y.as_ptr() as usize,
+                        input.x.len(),
+                        input.name.to_owned(),
+                    )
+                })
+                .collect();
             self.palette_dark = ui.visuals().dark_mode;
             let preserve = !self.keys.is_empty() && self.range != self.domain;
             let old_range = self.range;
@@ -302,6 +310,7 @@ impl SpectrumPlot {
         ui.small("Drag across an X interval to zoom. Scroll to zoom X. Double-click or Full range to reset. Y fits the visible samples.");
         // Trace visibility controls live outside the graph, so curves stay unobstructed.
         let mut visibility_changed = false;
+        let legend_width = ui.available_width().min(280.0);
         egui::ScrollArea::vertical()
             .id_salt((plot_id, "legend"))
             .max_height(82.0)
@@ -310,18 +319,23 @@ impl SpectrumPlot {
                     for trace in &self.traces {
                         let key = trace.id;
                         let visible = !self.hidden.contains(&key);
-                        let button = ui.add(
-                            egui::Button::new(
-                                egui::RichText::new(format!("    {}", trace.name)).color(
-                                    if visible {
-                                        trace.color
-                                    } else {
-                                        ui.visuals().weak_text_color()
-                                    },
-                                ),
+                        let button = ui
+                            .add_sized(
+                                [legend_width, 34.0],
+                                egui::Button::new("")
+                                    .left_text(
+                                        egui::RichText::new(format!("    {}", trace.name)).color(
+                                            if visible {
+                                                trace.color
+                                            } else {
+                                                ui.visuals().weak_text_color()
+                                            },
+                                        ),
+                                    )
+                                    .selected(visible)
+                                    .wrap_mode(egui::TextWrapMode::Truncate),
                             )
-                            .selected(visible),
-                        );
+                            .on_hover_text(&trace.name);
                         let dot = egui::pos2(button.rect.left() + 12.0, button.rect.center().y);
                         ui.painter().circle_filled(
                             dot,

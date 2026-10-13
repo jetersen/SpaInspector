@@ -26,7 +26,7 @@ cargo run browser
 # http://127.0.0.1:8081
 ```
 
-The egui app opens multiple local files, selects spectra or interferograms, displays metadata/history/sections, and exports all series. Choose Overlay spectra to compare loaded spectra with matching X/Y units on one graph. Each trace retains its own coordinates and sampling.
+The egui app opens multiple local files, selects spectra or interferograms, displays metadata/history/sections, and exports all series. Choose Overlay spectra to compare loaded spectra with matching X/Y units on one graph. Each trace retains its own coordinates and sampling. Individual and overlay views share the plot controls, axis-direction row, card styling, and legend layout. Hover a truncated legend name to see it in full.
 
 For a spectral section, enter X min/max and apply the interval, use a wavenumber preset, or drag horizontally across the graph. Wheel zoom affects X; Y fits the visible samples. Double-click or Full range restores the complete interval. Free panning is disabled.
 
@@ -92,3 +92,19 @@ reprocessing are not included in the app, libraries, browser builds, or packages
 Run `python3 tools/check-public-boundary.py` before publishing. It rejects
 processing source, research, fixtures, benchmarks, and private dependencies in
 the public tree. The check is also part of CI.
+
+## Downloads and releases
+
+The browser viewer is hosted at https://jetersen.github.io/SpaInspector/.
+The Desktop packages workflow builds a Windows x64 executable and per-user MSI,
+Linux x86_64 AppImage and Flatpak bundle, and Intel and Apple Silicon macOS DMGs.
+Main-branch builds and manual runs provide downloadable workflow artifacts.
+Publish a GitHub release with a three-part version tag such as `v0.1.0` to attach
+the packages and SHA-256 checksums to that release.
+
+The MSI installs under the current user's local application directory. Install
+the Flatpak bundle with `flatpak install --user ./SpaInspector-*.flatpak`; its
+runtime comes from Flathub. Flatpak opens files through the desktop portal.
+Windows packages are unsigned. macOS apps use an ad-hoc signature and are not
+Apple-notarized; distributing trusted signed installers requires signing credentials.
+NuGet packages are built on release; publishing them requires `NUGET_API_KEY`.

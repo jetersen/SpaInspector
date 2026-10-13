@@ -535,18 +535,13 @@ impl InspectorApp {
                     return;
                 }
                 crate::appearance::card(ui).show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        egui::ComboBox::from_label("Series")
-                            .width(260.0)
-                            .selected_text(&document.series[file.selected_series].name)
-                            .show_ui(ui, |ui| {
-                                for (index, series) in document.series.iter().enumerate() {
-                                    ui.selectable_value(&mut file.selected_series, index,
-                                        format!("{} ({})", series.name, series.kind));
-                                }
-                            });
-                        ui.checkbox(&mut file.reverse_x, "Reverse X axis");
-                    });
+                    plot_source_controls(ui, "Series", &document.series[file.selected_series].name,
+                        &mut file.reverse_x, |ui| {
+                            for (index, series) in document.series.iter().enumerate() {
+                                ui.selectable_value(&mut file.selected_series, index,
+                                    format!("{} ({})", series.name, series.kind));
+                            }
+                        });
                     // Prepare a changed series before its first plot frame.
                     if file.cached_series != Some(file.selected_series) {
                         file.plot.invalidate();
@@ -584,7 +579,7 @@ impl InspectorApp {
     }
     fn overlay_inspector(&mut self, parent: &mut egui::Ui) {
         let frame = egui::Frame::new()
-            .inner_margin(24)
+            .inner_margin(20)
             .fill(parent.visuals().panel_fill);
         egui::CentralPanel::default().frame(frame).show(parent, |ui| {
             ui.heading(egui::RichText::new("Overlay spectra").strong());
@@ -604,49 +599,51 @@ impl InspectorApp {
             if !groups.iter().any(|(p, _)| Some(*p) == self.overlay_units) {
                 self.overlay_units = Some(groups[0].0);
             }
-            let old_units = self.overlay_units;
-            egui::ComboBox::from_label("Overlay units")
-                .selected_text(&groups.iter().find(|(p, _)| Some(*p) == self.overlay_units).unwrap().1)
-                .show_ui(ui, |ui| {
-                    for (pair, label) in &groups {
-                        ui.selectable_value(&mut self.overlay_units, Some(*pair), label);
-                    }
-                });
-            if old_units != self.overlay_units {
-                self.overlay_plot.invalidate();
-                self.overlay_reverse = None;
-            }
-            ui.label("Choose files in the sidebar. Spectra with different units are shown in separate groups.");
-            let mut names = Vec::new();
-            let mut series = Vec::new();
-            let mut samples = Vec::new();
-            for file in self.files.iter().filter(|f| f.overlay_enabled) {
-                if let Some(doc) = &file.document {
-                    for s in doc.series.iter().filter(|s| s.kind == "spectrum"
-                        && Some((s.metadata.x_unit_code, s.metadata.y_unit_code)) == self.overlay_units)
-                    {
-                        names.push(if doc.series.iter().filter(|s| s.kind == "spectrum").count() == 1 {
-                            file.name.clone()
-                        } else {
-                            format!("{} · {} / {}", file.name, s.secondary_selector, s.tertiary_selector)
-                        });
-                        samples.push((s.x.as_slice(), s.y.as_slice()));
-                        series.push(s);
+            ui.small("Choose files in the sidebar. Spectra with different units are shown in separate groups.");
+            crate::appearance::card(ui).show(ui, |ui| {
+                let old_units = self.overlay_units;
+                let mut reversed = self.overlay_reverse.unwrap_or(matches!(self.overlay_units.unwrap().0, 1 | 32));
+                let reverse_changed = plot_source_controls(ui, "Overlay units",
+                    &groups.iter().find(|(p, _)| Some(*p) == self.overlay_units).unwrap().1,
+                    &mut reversed, |ui| {
+                        for (pair, label) in &groups {
+                            ui.selectable_value(&mut self.overlay_units, Some(*pair), label);
+                        }
+                    });
+                if old_units != self.overlay_units {
+                    self.overlay_plot.invalidate();
+                    self.overlay_reverse = None;
+                    reversed = matches!(self.overlay_units.unwrap().0, 1 | 32);
+                } else if reverse_changed {
+                    self.overlay_reverse = Some(reversed);
+                }
+                let mut names = Vec::new();
+                let mut series = Vec::new();
+                let mut samples = Vec::new();
+                for file in self.files.iter().filter(|f| f.overlay_enabled) {
+                    if let Some(doc) = &file.document {
+                        for s in doc.series.iter().filter(|s| s.kind == "spectrum"
+                            && Some((s.metadata.x_unit_code, s.metadata.y_unit_code)) == self.overlay_units)
+                        {
+                            names.push(if doc.series.iter().filter(|s| s.kind == "spectrum").count() == 1 {
+                                file.name.clone()
+                            } else {
+                                format!("{} · {} / {}", file.name, s.secondary_selector, s.tertiary_selector)
+                            });
+                            samples.push((s.x.as_slice(), s.y.as_slice()));
+                            series.push(s);
+                        }
                     }
                 }
-            }
-            if series.is_empty() {
-                ui.label("Select at least one file in this unit group.");
-                return;
-            }
-            let inputs = samples.iter().zip(&names).map(|((x, y), name)| TraceInput { name, x, y }).collect::<Vec<_>>();
-            let m = &series[0].metadata;
-            let mut reversed = self.overlay_reverse.unwrap_or(matches!(m.x_unit_code, 1 | 32));
-            if ui.checkbox(&mut reversed, "Reverse X axis").changed() {
-                self.overlay_reverse = Some(reversed);
-            }
-            self.overlay_plot.show(ui, "overlay-spectrum", &inputs, (&m.x_unit, &m.y_unit),
-                PlotOptions { reversed, wavenumber: matches!(m.x_unit_code, 1 | 32), height: None });
+                if series.is_empty() {
+                    ui.label("Select at least one file in this unit group.");
+                    return;
+                }
+                let inputs = samples.iter().zip(&names).map(|((x, y), name)| TraceInput { name, x, y }).collect::<Vec<_>>();
+                let m = &series[0].metadata;
+                self.overlay_plot.show(ui, "overlay-spectrum", &inputs, (&m.x_unit, &m.y_unit),
+                    PlotOptions { reversed, wavenumber: matches!(m.x_unit_code, 1 | 32), height: None });
+            });
         });
     }
 }
@@ -678,6 +675,44 @@ impl eframe::App for InspectorApp {
         self.notifications.show(ui.ctx());
         self.capture_control_ui(ui.ctx());
     }
+}
+
+// Both views keep source selection and axis direction on the same responsive row.
+fn plot_source_controls(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected_text: &str,
+    reversed: &mut bool,
+    choices: impl FnOnce(&mut egui::Ui),
+) -> bool {
+    ui.horizontal_wrapped(|ui| {
+        let source = ui
+            .allocate_ui_with_layout(
+                egui::vec2(84.0, 34.0),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    ui.set_min_size(egui::vec2(84.0, 34.0));
+                    ui.add(egui::Label::new(label).truncate())
+                },
+            )
+            .inner;
+        ui.allocate_ui_with_layout(
+            egui::vec2(260.0, 34.0),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.set_min_size(egui::vec2(260.0, 34.0));
+                egui::ComboBox::from_id_salt(("plot-source", label))
+                    .width(260.0)
+                    .truncate()
+                    .selected_text(selected_text)
+                    .show_ui(ui, choices)
+                    .response
+                    .labelled_by(source.id);
+            },
+        );
+        ui.checkbox(reversed, "Reverse X axis").changed()
+    })
+    .inner
 }
 
 fn prepare_series(file: &mut OpenFile) {

@@ -998,3 +998,75 @@ fn public_app_does_not_offer_or_execute_numerical_processing() {
     );
     assert_eq!(object["data"]["classId"], 159);
 }
+
+#[test]
+fn both_plot_views_share_control_order_and_legend_sizing() {
+    let mut h = loaded();
+    for width in [1500.0, 800.0] {
+        h.set_size(egui::vec2(width, 1100.0));
+        let mut legend_sizes = Vec::new();
+        let mut control_layouts = Vec::new();
+        for overlay in [false, true] {
+            h.state_mut().overlay = overlay;
+            h.run_steps(3);
+            let source = h
+                .get_by_label(if overlay { "Overlay units" } else { "Series" })
+                .rect();
+            let reversed = h.get_by_label("Reverse X axis").rect();
+            let min = h.get_by_label("X min").rect();
+            let max = h.get_by_label("X max").rect();
+            let zoom = h.get_by_label("Zoom in").rect();
+            let reset = h.get_by_label("Full range").rect();
+            let preset = h.get_by_label("1500–700").rect();
+            assert!(source.center().y <= reversed.center().y);
+            assert!(reversed.bottom() < min.top());
+            assert!(min.center().y == max.center().y);
+            assert!(reset.top() >= zoom.top());
+            assert!(preset.top() > min.bottom());
+            let origin = egui::pos2(min.left(), source.top());
+            control_layouts.push([
+                reversed.min - origin,
+                min.min - origin,
+                max.min - origin,
+                zoom.min - origin,
+                reset.min - origin,
+                preset.min - origin,
+            ]);
+            let name = if overlay {
+                h.state().overlay_plot.trace_names().next().unwrap()
+            } else {
+                h.state().files[0].plot.trace_names().next().unwrap()
+            }
+            .to_owned();
+            let sidebar_right =
+                egui::containers::panel::PanelState::load(&h.ctx, egui::Id::new("files"))
+                    .unwrap()
+                    .outer_rect
+                    .right();
+            let legend = h
+                .query_all_by_role_and_label(accesskit::Role::Button, &name)
+                .find(|node| node.rect().left() > sidebar_right)
+                .expect("Plot legend")
+                .rect();
+            assert!(legend.top() > preset.bottom());
+            assert!(legend.width() <= 280.0);
+            assert_eq!(legend.height(), 34.0);
+            legend_sizes.push(legend.size());
+            h.get_by_label("Reverse X axis").click();
+            h.run_steps(3);
+            if overlay {
+                assert_eq!(h.state().overlay_reverse, Some(false));
+            } else {
+                assert!(!h.state().files[0].reverse_x);
+            }
+            // Restore axis direction so the next viewport starts identically.
+            h.get_by_label("Reverse X axis").click();
+            h.run_steps(3);
+        }
+        assert_eq!(legend_sizes[0], legend_sizes[1]);
+        assert_eq!(
+            control_layouts[0], control_layouts[1],
+            "Plot control layout at width {width}"
+        );
+    }
+}

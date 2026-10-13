@@ -9,6 +9,7 @@ permissions:
 
 env:
   RELEASE: 'true'
+  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
 
 jobs:
   release:
@@ -30,7 +31,12 @@ jobs:
           version="${RELEASE_TAG#v}"
           dotnet pack src/SpaInspectorReader -c Release -p:Version="$version" -o artifacts/packages
           dotnet pack src/SpaFileReader -c Release -p:Version="$version" -o artifacts/packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages/*.nupkg
       - name: Push NuGet
+        if: env.NUGET_API_KEY != ''
         run: dotnet nuget push 'artifacts/packages/*.nupkg' --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

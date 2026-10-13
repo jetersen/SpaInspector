@@ -17,7 +17,7 @@ lto = "thin"
 [profile.release.package.spa-reader]
 opt-level = 3
 
-# Keep numerical previews fast during normal desktop development.
+# Keep parsing and exports fast during normal desktop development.
 [profile.dev.package.spa-reader]
 opt-level = 3
 
