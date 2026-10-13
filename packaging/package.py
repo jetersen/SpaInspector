@@ -22,7 +22,7 @@ root.mkdir(parents=True, exist_ok=True)
 app_id = 'io.github.jetersen.SpaInspector'
 if a.platform == 'windows':
     shutil.copy2(a.binary, root / 'spa-inspector.exe')
-    shutil.copy2('LICENSE', root / 'LICENSE')
+    shutil.copy2('LICENSE.md', root / 'LICENSE')
     wxs = f'''<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
 <Package Name="SPA Inspector" Manufacturer="jetersen" Version="{numeric}" UpgradeCode="B8400F43-95DB-4B9D-BB9E-4944638A9256" Scope="perUser">
 <MajorUpgrade DowngradeErrorMessage="A newer version is already installed."/><MediaTemplate EmbedCab="yes"/>
@@ -42,7 +42,7 @@ elif a.platform == 'macos':
     (contents / 'MacOS').mkdir(parents=True, exist_ok=True)
     (contents / 'Resources').mkdir(exist_ok=True)
     shutil.copy2(a.binary, contents / 'MacOS' / 'spa-inspector')
-    shutil.copy2('LICENSE', contents / 'Resources' / 'LICENSE')
+    shutil.copy2('LICENSE.md', contents / 'Resources' / 'LICENSE')
     with (contents / 'Info.plist').open('wb') as f:
         plistlib.dump(dict(CFBundleName='SPA Inspector', CFBundleDisplayName='SPA Inspector', CFBundleIdentifier=app_id,
             CFBundleExecutable='spa-inspector', CFBundlePackageType='APPL', CFBundleShortVersionString=numeric,
