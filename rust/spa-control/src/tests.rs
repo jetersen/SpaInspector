@@ -1,7 +1,7 @@
 use super::*;
 use serde_json::json;
 use std::{
-    io::{Read, Write},
+    io::{BufRead, BufReader, Write},
     net::{Ipv4Addr, TcpStream},
     sync::{
         Arc,
@@ -130,9 +130,13 @@ fn native_transport_calls_actor_and_rejects_foreign_origins_before_dispatch() {
     .unwrap();
     assert_eq!(result["method"], "state");
     let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, server.port)).unwrap();
-    write!(stream,"POST /control HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nOrigin: https://example.com\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{{}}",server.port).unwrap();
+    write!(stream,"POST /control HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nOrigin: https://example.com\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n",server.port).unwrap();
     let mut reply = String::new();
-    let _ = stream.read_to_string(&mut reply);
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .unwrap();
+    // Reject from the headers, before the client sends the request body.
+    BufReader::new(stream).read_line(&mut reply).unwrap();
     assert!(reply.starts_with("HTTP/1.1 403"));
     assert_eq!(calls.load(Ordering::Relaxed), 1);
 }
