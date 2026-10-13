@@ -3,17 +3,17 @@
 public class SpaBuilder
 {
     private uint _unitSize;
-    private string _xUnits;
-    private string _xTitle;
-    private string _unit;
-    private string _unitTitle;
+    private string _xUnits = "";
+    private string _xTitle = "";
+    private string _unit = "";
+    private string _unitTitle = "";
     private float _firstX;
     private float _lastX;
     private uint _numberOfScan;
     private uint _numberOfBackgroundScan;
-    private string _title;
+    private string _title = "";
     private DateTime _dateTime;
-    private string _history;
+    private string _history = "";
     private float[] _unitIntensities = Array.Empty<float>();
     private float[] _unitInterferogram = Array.Empty<float>();
     private float[] _backgroundInterferogram = Array.Empty<float>();

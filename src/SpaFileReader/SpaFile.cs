@@ -1,262 +1,99 @@
-﻿namespace SpaFileReader;
+using System.Buffers.Binary;
+using SpaInspectorReader;
 
+namespace SpaFileReader;
+
+/// <summary>Compatibility helpers. Reads return copies; only explicit writes modify the destination.</summary>
 [PublicAPI]
 public static class SpaFile
 {
-    private const short YUnitFlag = 3;
-    private const short InterferogramFlag = 102;
-    private const short BackgroundInterferogramFlag = 103;
-    private const int SizeAddress = 0x000126;
-    private const int PositionsAddress = 0x000130;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<byte> ReadYUnitAsSpanByte(byte[] bytes)
+    public static Span<byte> ReadYUnitAsSpanByte(byte[] bytes) => ReadYUnitAsSpanByte(bytes.AsSpan());
+    public static Span<byte> ReadYUnitAsSpanByte(ref Span<byte> bytes) => ReadYUnitAsSpanByte(bytes);
+    private static Span<byte> ReadYUnitAsSpanByte(Span<byte> bytes)
     {
-        var span = bytes.AsSpan();
-        var yUnitAsBytes = ReadYUnitAsSpanByte(ref span);
-        return yUnitAsBytes;
+        _ = SpaParser.Parse(bytes);
+        return SpaDirectory.Parse(bytes).Find(3)?.Payload.ToArray() ?? Array.Empty<byte>();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadYUnitAsSpanFloat(byte[] bytes)
+    public static Span<float> ReadYUnitAsSpanFloat(byte[] bytes) => ReadYUnitAsFloatArray(bytes);
+    public static Span<float> ReadYUnitAsSpanFloat(ref Span<byte> bytes) => PrimaryValues(bytes);
+    public static Span<float> ReadYUnitAsSpanFloat(string file) => ReadYUnitAsFloatArray(file);
+    public static float[] ReadYUnitAsFloatArray(byte[] bytes) => PrimaryValues(bytes);
+    public static float[] ReadYUnitAsFloatArray(string file) => ReadYUnitAsFloatArray(File.ReadAllBytes(file));
+    public static async Task<float[]> ReadYUnitAsFloatArrayAsync(string file) => ReadYUnitAsFloatArray(await File.ReadAllBytesAsync(file));
+
+    public static Span<double> ReadYUnitAsSpanDouble(byte[] bytes) => ReadYUnitAsDoubleArray(bytes);
+    public static Span<double> ReadYUnitAsSpanDouble(ref Span<byte> bytes) => PrimaryValues(bytes).Select(value => (double)value).ToArray();
+    public static Span<double> ReadYUnitAsSpanDouble(string file) => ReadYUnitAsDoubleArray(file);
+    public static double[] ReadYUnitAsDoubleArray(byte[] bytes) => PrimaryValues(bytes).Select(value => (double)value).ToArray();
+    public static double[] ReadYUnitAsDoubleArray(ref Span<byte> bytes) => PrimaryValues(bytes).Select(value => (double)value).ToArray();
+    public static double[] ReadYUnitAsDoubleArray(string file) => ReadYUnitAsDoubleArray(File.ReadAllBytes(file));
+    public static async Task<double[]> ReadYUnitAsDoubleArrayAsync(string file) => ReadYUnitAsDoubleArray(await File.ReadAllBytesAsync(file));
+
+    public static Span<float> ReadInterferogramAsSpanFloat(byte[] bytes) => InterferogramValues(bytes, "sample_interferogram");
+    public static Span<float> ReadInterferogramAsSpanFloat(ref Span<byte> bytes) => InterferogramValues(bytes, "sample_interferogram");
+    public static Span<float> ReadBackgroundInterogramAsSpanFloat(byte[] bytes) => InterferogramValues(bytes, "background_interferogram");
+    public static Span<float> ReadBackgroundInterogramAsSpanFloat(ref Span<byte> bytes) => InterferogramValues(bytes, "background_interferogram");
+    public static Span<byte> ReadInterferogramAsSpanByte(ref Span<byte> bytes) => RawInterferogram(bytes, 102);
+    public static Span<byte> ReadBackgroundInterferogramAsSpanByte(ref Span<byte> bytes) => RawInterferogram(bytes, 103);
+
+    private static float[] PrimaryValues(ReadOnlySpan<byte> bytes) => SpaParser.Parse(bytes).Series
+        .FirstOrDefault(series => series.Kind == "spectrum" && series.SecondarySelector == 0 && series.TertiarySelector == 0)?.Y.ToArray() ?? Array.Empty<float>();
+
+    private static float[] InterferogramValues(ReadOnlySpan<byte> bytes, string kind) => SpaParser.Parse(bytes).Series
+        .FirstOrDefault(series => series.Kind == kind && series.SecondarySelector == 0 && series.TertiarySelector == 0)?.Y.ToArray() ?? Array.Empty<float>();
+
+    private static byte[] RawInterferogram(ReadOnlySpan<byte> bytes, ushort type)
     {
-        var span = bytes.AsSpan();
-        var yUnitAsSpanFloat = ReadYUnitAsSpanFloat(ref span);
-        return yUnitAsSpanFloat;
+        _ = SpaParser.Parse(bytes);
+        return SpaDirectory.Parse(bytes).Find(type)?.Payload.ToArray() ?? Array.Empty<byte>();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadInterferogramAsSpanFloat(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        var yUnitAsSpanFloat = ReadInterferogramAsSpanFloat(ref span);
-        return yUnitAsSpanFloat;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadBackgroundInterogramAsSpanFloat(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        var yUnitAsSpanFloat = ReadBackgroundInterogramAsSpanFloat(ref span);
-        return yUnitAsSpanFloat;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float[] ReadYUnitAsFloatArray(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        var yUnitAsFloatArray = ReadYUnitAsSpanFloat(ref span);
-        return yUnitAsFloatArray.ToArray();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadYUnitAsSpanFloat(string file)
-    {
-        var bytes = File.ReadAllBytes(file);
-        var yUnitAsSpanFloat = ReadYUnitAsSpanFloat(bytes);
-        return yUnitAsSpanFloat;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float[] ReadYUnitAsFloatArray(string file)
-    {
-        var bytes = File.ReadAllBytes(file);
-        var yUnitAsFloatArray = ReadYUnitAsFloatArray(bytes);
-        return yUnitAsFloatArray;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double[] ReadYUnitAsDoubleArray(string file)
-    {
-        var bytes = File.ReadAllBytes(file);
-        var yUnitAsDoubleArray = ReadYUnitAsDoubleArray(bytes);
-        return yUnitAsDoubleArray;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static async Task<float[]> ReadYUnitAsFloatArrayAsync(string file)
-    {
-        var bytes = await File.ReadAllBytesAsync(file);
-        var yUnitAsFloatArray = ReadYUnitAsFloatArray(bytes);
-        return yUnitAsFloatArray;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static async Task<double[]> ReadYUnitAsDoubleArrayAsync(string file)
-    {
-        var bytes = await File.ReadAllBytesAsync(file);
-        var yUnitAsDoubleArray = ReadYUnitAsDoubleArray(bytes);
-        return yUnitAsDoubleArray;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<double> ReadYUnitAsSpanDouble(string file)
-    {
-        var bytes = File.ReadAllBytes(file);
-        var yUnitAsSpanFloat = ReadYUnitAsDoubleArray(bytes);
-        return yUnitAsSpanFloat;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<double> ReadYUnitAsSpanDouble(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        var yUnitAsDoubles = ReadYUnitAsSpanDouble(ref span);
-        return yUnitAsDoubles;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double[] ReadYUnitAsDoubleArray(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        var yUnitAsDoubleArray = ReadYUnitAsDoubleArray(ref span);
-        return yUnitAsDoubleArray;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<byte> ReadYUnitAsSpanByte(ref Span<byte> bytes)
-    {
-        var (start, length) = ReadSpecificFlagPositions(ref bytes, YUnitFlag);
-        var yUnitAsBytes = bytes.Slice(start, length);
-        return yUnitAsBytes;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Writes bytes in their original stored order, requiring the exact payload length.</summary>
     public static Span<byte> WriteYUnitAsSpanByte(Span<byte> bytes, Span<byte> yUnits)
     {
-        return WriteByteAt(ref bytes, YUnitFlag, yUnits);
+        _ = SpaParser.Parse(bytes);
+        var section = SpaDirectory.Parse(bytes).Find(3) ?? throw new InvalidDataException("SPA has no default-selector primary data section.");
+        if (yUnits.Length != section.Length)
+            throw new ArgumentException($"Replacement payload must have exactly {section.Length} bytes.", nameof(yUnits));
+        yUnits.CopyTo(bytes.Slice((int)section.Offset, (int)section.Length));
+        return bytes;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadYUnitAsSpanFloat(ref Span<byte> bytes)
-    {
-        var yUnitAsBytes = ReadYUnitAsSpanByte(ref bytes);
-        var yUnitAsFloats = MemoryMarshal.Cast<byte, float>(yUnitAsBytes);
-        // The floats in SPA file are stored from 4000 to 700 wave numbers
-        // Reversed to read from 700 to 4000 like how wave numbers are read in CSV.
-        yUnitAsFloats.Reverse();
-        return yUnitAsFloats;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Writes values in the same normalized order returned by the float reader.</summary>
     public static Span<byte> WriteYUnitAsSpanFloat(Span<byte> bytes, Span<float> yUnit)
     {
-        return WriteByteAt(ref bytes, YUnitFlag, MemoryMarshal.Cast<float, byte>(yUnit));
+        var document = SpaParser.Parse(bytes);
+        var primary = document.Series.FirstOrDefault(series => series.Kind == "spectrum" && series.SecondarySelector == 0 && series.TertiarySelector == 0)
+            ?? throw new InvalidDataException("SPA has no default-selector primary data series.");
+        if (yUnit.Length != primary.Y.Length)
+            throw new ArgumentException($"Replacement signal must have exactly {primary.Y.Length} values.", nameof(yUnit));
+        var stored = yUnit.ToArray();
+        if (primary.Metadata.YUnitCode != 22) Array.Reverse(stored);
+        var encoded = new byte[checked(stored.Length * 4)];
+        for (var index = 0; index < stored.Length; index++)
+            BinaryPrimitives.WriteSingleLittleEndian(encoded.AsSpan(index * 4, 4), stored[index]);
+        return WriteYUnitAsSpanByte(bytes, encoded);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<byte> ReadInterferogramAsSpanByte(ref Span<byte> bytes)
-    {
-        var (start, length) = ReadSpecificFlagPositions(ref bytes, InterferogramFlag);
-        var yUnitAsBytes = bytes.Slice(start, length);
-        return yUnitAsBytes;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadInterferogramAsSpanFloat(ref Span<byte> bytes)
-    {
-        var yUnitAsBytes = ReadInterferogramAsSpanByte(ref bytes);
-        var yUnitAsFloats = MemoryMarshal.Cast<byte, float>(yUnitAsBytes);
-        return yUnitAsFloats;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<byte> ReadBackgroundInterferogramAsSpanByte(ref Span<byte> bytes)
-    {
-        var (start, length) = ReadSpecificFlagPositions(ref bytes, BackgroundInterferogramFlag);
-        var yUnitAsBytes = bytes.Slice(start, length);
-        return yUnitAsBytes;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<float> ReadBackgroundInterogramAsSpanFloat(ref Span<byte> bytes)
-    {
-        var yUnitAsBytes = ReadBackgroundInterferogramAsSpanByte(ref bytes);
-        var yUnitAsFloats = MemoryMarshal.Cast<byte, float>(yUnitAsBytes);
-        return yUnitAsFloats;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double[] ReadYUnitAsDoubleArray(ref Span<byte> bytes)
-    {
-        var yUnitAsFloats = ReadYUnitAsSpanFloat(ref bytes);
-        var yUnitAsDoubles = new double[yUnitAsFloats.Length];
-        for (var i = 0; i < yUnitAsDoubles.Length; i++)
-        {
-            yUnitAsDoubles[i] = yUnitAsFloats[i];
-        }
-
-        return yUnitAsDoubles;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<double> ReadYUnitAsSpanDouble(ref Span<byte> bytes)
-    {
-        var yUnitAsFloats = ReadYUnitAsSpanFloat(ref bytes);
-        var yUnitAsDoubles = new double[yUnitAsFloats.Length];
-        for (var i = 0; i < yUnitAsDoubles.Length; i++)
-        {
-            yUnitAsDoubles[i] = yUnitAsFloats[i];
-        }
-
-        return yUnitAsDoubles;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static (int start, int length) ReadSpecificFlagPositions(ref Span<byte> bytes, short expectedFlag)
-    {
-        var size = bytes.ReadInt16At(SizeAddress);
-
-        var position = PositionsAddress;
-
-        for (var i = 0; i <= size; i++)
-        {
-            short flag = bytes.ReadByteAt(position);
-            if (flag == expectedFlag)
-            {
-                var start = bytes.ReadInt32At(position + 2);
-                var length = bytes.ReadInt32At(position + 6);
-                return (start, length);
-            }
-
-            position += 16;
-        }
-
-        return (0, 0);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte ReadByteAt(this ref Span<byte> data, int offset)
     {
-        return offset + 1 > data.Length
-            ? (byte)0
-            : MemoryMarshal.Read<byte>(data.Slice(offset, 1));
+        CheckRange(data, offset, 1);
+        return data[offset];
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static short ReadInt16At(this ref Span<byte> data, int offset)
     {
-        return offset + 2 > data.Length
-            ? (short)0
-            : MemoryMarshal.Read<short>(data.Slice(offset, 2));
+        CheckRange(data, offset, 2);
+        return BinaryPrimitives.ReadInt16LittleEndian(data.Slice(offset, 2));
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int ReadInt32At(this ref Span<byte> data, int offset)
     {
-        return offset + 4 > data.Length
-            ? 0
-            : MemoryMarshal.Read<int>(data.Slice(offset, 4));
+        CheckRange(data, offset, 4);
+        return BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
     }
-    private static Span<byte> WriteByteAt(this ref Span<byte> data, short expectedFlag, Span<byte> bytesToWrite)
+    private static void CheckRange(ReadOnlySpan<byte> data, int offset, int width)
     {
-        var (start, length) = ReadSpecificFlagPositions(ref data, expectedFlag);
-        var n = 0;
-        for (var i = start; start + length > i; i ++)
-        {
-            data[i] = bytesToWrite[n];
-            n++;
-        }
-        return data;
+        if (offset < 0 || offset > data.Length - width)
+            throw new ArgumentOutOfRangeException(nameof(offset), "Read extends outside the supplied data.");
     }
 }

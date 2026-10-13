@@ -9,7 +9,7 @@ public class ReadTest
     }
 
     [Fact]
-    public async void BinaryReaderReadTest()
+    public async Task BinaryReaderReadTest()
     {
         var memoryStream = await TestFile("test1.spa").FileAsMemoryStream();
         var spa = memoryStream.ReadSpa();

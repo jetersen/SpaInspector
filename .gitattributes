@@ -4,3 +4,5 @@
 *.ttf binary
 *.woff binary
 *.spa binary
+*.f32 binary -working-tree-encoding
+src/SpaInspector/wwwroot/vendor/plotly/plotly.min.js -whitespace

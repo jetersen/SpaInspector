@@ -1,0 +1,4 @@
+[target.wasm32-unknown-unknown]
+# Browser builds enable WebAssembly SIMD. Override with RUSTFLAGS=-Ctarget-feature=-simd128
+# when deliberately building for a runtime without WebAssembly SIMD.
+rustflags = ["-C", "target-feature=+simd128"]

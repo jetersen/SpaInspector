@@ -1,0 +1,19 @@
+[package]
+name = "spa-reader"
+description = "Checked, loss-preserving reader and CSV/JSON exporter for OMNIC SPA files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+encoding_rs = "0.8.42"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+time = { version = "0.3.55", features = ["formatting"] }
+
+[[bin]]
+name = "spa-convert"
+path = "src/bin/convert.rs"

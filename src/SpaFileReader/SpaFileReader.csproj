@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="JetBrains.Annotations" Version="2021.3.0" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1">
+        <ProjectReference Include="../SpaInspectorReader/SpaInspectorReader.csproj" />
+        <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -18,11 +19,13 @@
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <Nullable>enable</Nullable>
         <Authors>Specshell</Authors>
+        <Description>Legacy SPA and group accessors backed by the SpaInspector reader.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <Company>Specshell</Company>
         <Owners>Specshell</Owners>
         <Copyright>Copyright $([System.DateTime]::UtcNow.ToString(yyyy)) Specshell. All rights reserved</Copyright>
         <TreatWarningsAsErrors Condition="$(TreatWarningsAsErrors) == ''">true</TreatWarningsAsErrors>
-        <LangVersion Condition="$(LangVersion) == ''">10.0</LangVersion>
+        <LangVersion Condition="$(LangVersion) == ''">14.0</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 

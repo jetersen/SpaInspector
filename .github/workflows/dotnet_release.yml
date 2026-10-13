@@ -1,62 +1,36 @@
-﻿name: .NET Release
+name: .NET Release
 
 on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 env:
-  RELEASE: "true"
+  RELEASE: 'true'
 
 jobs:
   release:
-    runs-on: ubuntu-20.04
-    name: Release
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - uses: actions/cache@v2
+      - name: Check public distribution boundary
+        run: python tools/check-public-boundary.py
+      - uses: actions/setup-dotnet@v5
         with:
-          path: |
-            ~/.nuget/packages
-            .dotnet/tools
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Setup DotNet
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 6.0.x
-
-      - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v0.9.7
-        with:
-          versionSpec: '5.x'
-
-      - name: Determine Version
-        uses: gittools/actions/gitversion/execute@v0.9.7
-        with:
-          useConfigFile: true
-
-      - name: Restore dependencies
-        run: |
-          dotnet restore
-
-      - name: DotNet Build
-        run: |
-          dotnet build --no-restore
-          dotnet build --configuration Release --no-restore
-          dotnet pack --configuration Release --no-restore --no-build
-
-      - name: DotNet Test
-        run: |
-          dotnet test --configuration Release --no-build --no-restore
-
-      - name: Push NuGet
-        run: dotnet nuget push **/*.nupkg --source $SOURCE --api-key $TOKEN --skip-duplicate
+          dotnet-version: 10.0.x
+      - run: dotnet test SpaInspector.sln -c Release --nologo
+      - name: Pack with the release tag version
         env:
-          SOURCE: 'https://api.nuget.org/v3/index.json'
-          TOKEN: ${{ secrets.NUGET_API_KEY }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          dotnet pack src/SpaInspectorReader -c Release -p:Version="$version" -o artifacts/packages
+          dotnet pack src/SpaFileReader -c Release -p:Version="$version" -o artifacts/packages
+      - name: Push NuGet
+        run: dotnet nuget push 'artifacts/packages/*.nupkg' --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

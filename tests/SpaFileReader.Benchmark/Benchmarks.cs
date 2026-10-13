@@ -50,8 +50,8 @@ public class Benchmarks
     [Benchmark]
     public float[] BinaryReaderReadAbsorbance()
     {
-        Stream stream = new MemoryStream(_bytes);
-        var read = new Read(stream);
+        using Stream stream = new MemoryStream(_bytes);
+        using var read = new Read(stream);
         var absorbance = read.ReadBinaryToSpa().UnitIntensities;
         return absorbance;
     }

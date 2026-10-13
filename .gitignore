@@ -360,3 +360,12 @@ MigrationBackup/
 .ionide/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudio
+
+# Rust and browser build output
+/target/
+**/target/
+**/dist/
+
+# Rust CLI source is not a .NET bin directory.
+!/rust/spa-reader/src/bin/
+!/rust/spa-reader/src/bin/*.rs

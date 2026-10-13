@@ -1,57 +1,55 @@
-﻿name: .NET Build
+name: Build and test
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
-    name: Build
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v6
+      - name: Check public distribution boundary
+        run: python tools/check-public-boundary.py
+      - uses: actions/setup-dotnet@v5
         with:
-          fetch-depth: 0
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Setup DotNet
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 6.0.x
-
-      - name: Restore dependencies
+          dotnet-version: 10.0.x
+      - name: Set up Rust
         run: |
-          dotnet restore
-
-      - name: DotNet Build
+          rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.99.0
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked --workspace
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo build --locked --release --workspace
+      - run: dotnet test SpaInspector.sln -c Release --nologo
+      - name: Compare Rust and C# exports
+        run: python tools/check-parity.py
+      - name: Pack reader libraries
         run: |
-          dotnet build --no-restore
-          dotnet build --configuration Release --no-restore
-          dotnet pack --configuration Release --no-restore --no-build
+          dotnet pack src/SpaInspectorReader -c Release --no-build
+          dotnet pack src/SpaFileReader -c Release --no-build
 
-      - name: DotNet Test
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Rust and Trunk
         run: |
-          dotnet test --no-build --no-restore
-
-      - name: Test
-        run: dotnet test -c Release --collect:"XPLat Code Coverage" --settings coverlet.runsettings --results-directory "coverage" --verbosity normal --no-build --no-restore
-
-      - name: Upload coverage reports
-        if: ${{ always() }}
-        uses: codecov/codecov-action@v1
-        with:
-          directory: ./coverage
-          name: codecov-specshell
-          fail_ci_if_error: true
-          verbose: false
+          rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.99.0
+          cargo install trunk --version 0.21.14 --locked
+      - name: Build egui WebAssembly
+        working-directory: rust/spa-inspector
+        env:
+          NO_COLOR: 'true'
+        run: trunk build --release
