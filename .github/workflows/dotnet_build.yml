@@ -47,7 +47,7 @@ jobs:
         run: |
           rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
           rustup default 1.99.0
-          cargo install trunk --version 0.21.14 --locked
+          bash tools/install-trunk.sh
       - name: Build egui WebAssembly
         working-directory: rust/spa-inspector
         env:

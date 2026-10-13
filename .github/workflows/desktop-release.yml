@@ -49,6 +49,15 @@ jobs:
         run: |
           rustup toolchain install 1.99.0 --profile minimal --target "$TARGET"
           rustup default 1.99.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: desktop-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            desktop-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-
       - name: Build
         env:
           RUSTFLAGS: ${{ matrix.platform == 'windows' && '-C target-feature=+crt-static' || '' }}

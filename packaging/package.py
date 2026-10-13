@@ -27,10 +27,11 @@ if a.platform == 'windows':
 <Package Name="SPA Inspector" Manufacturer="jetersen" Version="{numeric}" UpgradeCode="B8400F43-95DB-4B9D-BB9E-4944638A9256" Scope="perUser">
 <MajorUpgrade DowngradeErrorMessage="A newer version is already installed."/><MediaTemplate EmbedCab="yes"/>
 <StandardDirectory Id="LocalAppDataFolder"><Directory Id="Programs" Name="Programs"><Directory Id="INSTALLFOLDER" Name="SPA Inspector">
-<Component Id="Application"><File Id="InspectorExe" Source="spa-inspector.exe"/><File Source="LICENSE"/>
+<Component Id="Application" Guid="470F8E74-37A9-46DF-9995-577449762DC5"><File Id="InspectorExe" Source="spa-inspector.exe"/><File Source="LICENSE"/>
+<RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall"/><RemoveFolder Id="RemoveProgramsFolder" Directory="Programs" On="uninstall"/>
 <RegistryValue Root="HKCU" Key="Software\\jetersen\\SpaInspector" Name="Installed" Type="integer" Value="1" KeyPath="yes"/></Component>
 </Directory></Directory></StandardDirectory>
-<StandardDirectory Id="ProgramMenuFolder"><Directory Id="MenuFolder" Name="SPA Inspector"><Component Id="Menu">
+<StandardDirectory Id="ProgramMenuFolder"><Directory Id="MenuFolder" Name="SPA Inspector"><Component Id="Menu" Guid="4A2DD02B-CF7E-42D3-ABCB-28EA3C8A9C81">
 <Shortcut Id="Launch" Name="SPA Inspector" Target="[#InspectorExe]" WorkingDirectory="INSTALLFOLDER"/>
 <RemoveFolder Id="RemoveMenu" On="uninstall"/><RegistryValue Root="HKCU" Key="Software\\jetersen\\SpaInspector" Name="Shortcut" Type="integer" Value="1" KeyPath="yes"/>
 </Component></Directory></StandardDirectory>
@@ -53,6 +54,9 @@ else:
     bindir = appdir / 'usr/bin'
     bindir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(a.binary, bindir / 'spa-inspector')
+    licenses = appdir / 'usr/share/licenses/SpaInspector'
+    licenses.mkdir(parents=True, exist_ok=True)
+    shutil.copy2('LICENSE.md', licenses / 'LICENSE')
     desktop = f'[Desktop Entry]\nType=Application\nName=SPA Inspector\nExec=spa-inspector\nIcon={app_id}\nCategories=Science;Education;\nTerminal=false\n'
     (appdir / f'{app_id}.desktop').write_text(desktop)
     icon = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" rx="40" fill="#17212b"/><path d="M40 40V216H220M40 175L80 173L105 170L124 90L139 166L165 158L183 55L197 145L220 130" fill="none" stroke="#44cbd6" stroke-width="10" stroke-linejoin="round"/></svg>'
@@ -64,6 +68,7 @@ else:
         **{'finish-args':['--share=ipc','--socket=wayland','--socket=fallback-x11','--device=dri']},
         modules=[dict(name='spa-inspector', buildsystem='simple', **{'build-commands':[
             'install -Dm755 usr/bin/spa-inspector /app/bin/spa-inspector',
+            'install -Dm644 usr/share/licenses/SpaInspector/LICENSE /app/share/licenses/SpaInspector/LICENSE',
             f'install -Dm644 {app_id}.desktop /app/share/applications/{app_id}.desktop',
             f'install -Dm644 {app_id}.svg /app/share/icons/hicolor/scalable/apps/{app_id}.svg']}, sources=[dict(type='dir', path='SpaInspector.AppDir')])])
     (root / 'flatpak.json').write_text(json.dumps(manifest, indent=2) + '\n')
