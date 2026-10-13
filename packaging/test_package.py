@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import plistlib
 import subprocess
@@ -19,7 +20,8 @@ class PackagingTests(unittest.TestCase):
                     manifest = json.loads((output / 'flatpak.json').read_text())
                     self.assertNotIn('--share=network', manifest['finish-args'])
                     self.assertEqual(manifest['command'], 'spa-inspector')
-                    self.assertTrue((output / 'SpaInspector.AppDir/AppRun').stat().st_mode & 0o111)
+                    if os.name != 'nt':
+                        self.assertTrue((output / 'SpaInspector.AppDir/AppRun').stat().st_mode & 0o111)
                 elif platform == 'windows':
                     package = ET.parse(output / 'installer.wxs').getroot()[0]
                     self.assertEqual(package.attrib['Scope'], 'perUser')
